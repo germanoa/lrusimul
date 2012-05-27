@@ -15,6 +15,7 @@
 #include <include/list.h>
 #include <include/retcodes.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /*
  * Memory Actions
@@ -51,7 +52,6 @@ struct mem_actions_struct {
     int parameter2; /* If not used, receive NULL. */
 };
 
-
 /*
  * Process
  */
@@ -81,14 +81,19 @@ struct page_struct {
 
 
 /*
- * Receive input text file ; return mem_actions struct.
+ * Receive input text file ; load mem_actions struct.
  */
-mem_actions_struct file_2_memaction(char *file);
+void file_2_memaction(FILE *system_config);
+
+/*
+ * Execute the system.
+ */
+void system_run(mem_actions_struct *system);
 
 /*
  * LRU second choice
  */
-void lru2(mem_struct *mem);
+void lru_2nd_choice(mem_struct *mem);
 
 /*
  * MEMSIZE action 
