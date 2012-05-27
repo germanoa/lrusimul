@@ -1,0 +1,3 @@
+perguntas para professor:
+
+1. nós definimos tamanho maximo da memoria? (int, long int, etc) 
