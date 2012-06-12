@@ -26,6 +26,12 @@
 #define WRITE 3
 #define ENDPROC 4
 
+#define MEMSIZE_STR "MEMSIZE"
+#define PROCSIZE_STR "PROCSIZE"
+#define READ_STR "READ"
+#define WRITE_STR "WRITE"
+#define ENDPROC_STR "ENDPROC"
+
 /*
  * Page Locals
  */
@@ -50,6 +56,7 @@ struct mem_actions_struct {
     int action;
     int parameter1;
     int parameter2; /* If not used, receive NULL. */
+    mem_actions_struct *next;
 };
 
 /*
@@ -83,12 +90,17 @@ struct page_struct {
 /*
  * Receive input text file ; load mem_actions struct.
  */
-void file_2_memaction(FILE *system_config);
+mem_actions_struct* file_2_memaction ( FILE *system_config );
 
 /*
  * Execute the system.
  */
 void system_run(mem_actions_struct *system);
+
+/*
+ * Execute an action
+ */
+void execute_action(mem_actions_struct *action);
 
 /*
  * LRU second choice
