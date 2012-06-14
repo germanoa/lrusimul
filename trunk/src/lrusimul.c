@@ -57,7 +57,7 @@ mem_actions_struct* file_2_memaction ( FILE *system_config )
 		
 		//Read infos		
 	    argsReads = sscanf(line, "%s %d %d", action_str, &p1, &p2); 
-	    printf("%s %d %d\n", action_str, p1, p2);
+	    //printf("%s %d %d\n", action_str, p1, p2);
 	    if ( argsReads == 2 )
 	    {
 	    	if ( strcmp(action_str, MEMSIZE_STR) == 0 )
@@ -128,33 +128,13 @@ void system_run(mem_actions_struct *top)
 	}
 	
 	procs = malloc(sizeof(proc_struct_list));
-	for(;top->next; top = top->next)
+	for(;top; top = top->next)
 	{
-		printf("%d %d %d\n", top->action, top->parameter1, top->parameter2);
+		//printf("%d %d %d\n", top->action, top->parameter1, top->parameter2);
 		execute_action(top);
 	}
 	
 	print_procs_stats();
-}
-
-void print_procs_stats()
-{
-	int i;
-	
-	for(; procs; procs = procs->next)
-	{
-		printf("PROCESSO: %d\n", procs->proc->pid);
-		printf("Página Acessos(R/W) NroPageFault NroSubst\n");
-		for(i = 0; i < procs->proc->size; i++)
-		{
-			print_page_stats(procs->proc->page_table[i]);
-		}
-	}
-}
-
-void print_page_stats(page_struct page)
-{
-	printf("%d %d %d %d\n", page.page, (page.read_access + page.write_access), page.page_faults, page.nro_subst);
 }
 
 void execute_action(mem_actions_struct *action)
@@ -174,20 +154,106 @@ void execute_action(mem_actions_struct *action)
 			write_action(action->parameter1, action->parameter2);
 			break;
 		case ENDPROC:
+			printf("ENDPROC\n");
 			endproc_action(action->parameter1);
 			break;		
 	}
 }
 
-void lru_2nd_choice(mem_struct *mem)
+void lru_2nd_choice(page_struct *page)
 {
-    printf ("not implemented yet.\n");
+    if ( mem->used < mem->size)
+    {
+    	//just insert in FIFO
+    	if ( mem->loaded_pages_first == NULL )
+    	{
+    		mem->loaded_pages_first = page;
+    		mem->loaded_pages_tail = page;
+    		page->prev_mem_page = page->next_mem_page = NULL;
+    	}
+    	else
+    	{    		
+    		mem->loaded_pages_tail->next_mem_page = page;
+    		page->prev_mem_page = mem->loaded_pages_tail;
+    		mem->loaded_pages_tail = page;
+    		page->next_mem_page = NULL;
+    	}
+
+    	page->local = MEM;
+    	mem->used++;
+    }
+    else
+    {
+    	//LRU 2nd choice
+    	page_struct *candidate = mem->loaded_pages_first;
+
+    	while ( !(mem->loaded_pages_first->RB == 0 && mem->loaded_pages_first->MB == 0) )
+    	{
+    		if ( candidate->RB == 0 && candidate->MB == 1)
+	 		{
+	 			candidate->MB = 0;
+	 			move_to_mem_tail(candidate);
+	 			//printf("RB = 0 && MB = 1\n");
+	 		}
+	    	else if ( candidate->RB == 1 && candidate->MB == 0)
+	    	{
+	    		candidate->RB = 0;
+	    		move_to_mem_tail(candidate);
+	    		//printf("RB = 1 && MB = 0\n");
+	    	}
+	    	else if ( candidate->RB == 1 && candidate->MB == 1)
+	    	{
+	    		candidate->RB = 0;
+	    		move_to_mem_tail(candidate);
+	    		//printf("RB = 1 && MB = 1\n");
+	    	}		
+
+	    	candidate = mem->loaded_pages_first;	
+    	}   
+
+    	move_to_swap(mem->loaded_pages_first);//*/ 	
+   		mem->used--;
+    	lru_2nd_choice(page);
+    }
+}
+
+void move_to_mem_tail(page_struct *candidate)
+{
+	//move to tail
+	mem->loaded_pages_tail->next_mem_page = candidate;
+	candidate->prev_mem_page = mem->loaded_pages_tail;
+	mem->loaded_pages_tail = candidate;
+	mem->loaded_pages_first = candidate->next_mem_page;
+	mem->loaded_pages_first->prev_mem_page = NULL;
+	candidate->next_mem_page = NULL;
+}
+
+void move_to_swap(page_struct *page)
+{
+	page->local = SWAP;
+	page->RB = 0;
+	page->MB = 0;
+	page->nro_subst++;
+
+	//TODO: Verify if exists a bug when the frame size is 1.
+
+	if ( page->next_mem_page == NULL)
+	{
+		printf("NEXT IS NULL\n");
+	}
+	else
+	{
+		mem->loaded_pages_first = mem->loaded_pages_first->next_mem_page;
+		mem->loaded_pages_first->prev_mem_page = NULL;
+		page->next_mem_page = NULL;
+	}
 }
 
 void memsize_action(int size)
 {
 	mem = malloc(sizeof(mem_struct));
 	mem->size = size;
+	mem->used = 0;
 }
 
 void reset_page(page_struct *page, int page_number)
@@ -198,13 +264,13 @@ void reset_page(page_struct *page, int page_number)
 	}
 
 	page->page = page_number;
-	//page->local = SWAP;
-	//page->RB = 0;
-//	page->MB = 0;
-	//page->read_access = 0;
-///	page->write_access = 0;
-//	page->page_faults = 0;
-//	page->nro_subst = 0;
+	page->local = SWAP;
+	page->RB = 0;
+	page->MB = 0;
+	page->read_access = 0;
+	page->write_access = 0;
+	page->page_faults = 0;
+	page->nro_subst = 0;
 }
 
 int procsize_action(int pid, int size)
@@ -220,7 +286,7 @@ int procsize_action(int pid, int size)
 
     proc->pid = pid;
     proc->size = size;    
-    proc->page_table = malloc((1+ size) * sizeof(proc_struct)); 
+    proc->page_table = malloc((size + 1) * sizeof(page_struct)); 
     
     if (proc->page_table == NULL)
     {
@@ -228,7 +294,7 @@ int procsize_action(int pid, int size)
     	exit(1);
     }
     
-    for(i = 0; i < size; i++)
+    for(i = 0; i <= size; i++)
 	{
 		reset_page(&proc->page_table[i], i);
 	}
@@ -251,27 +317,144 @@ int procsize_action(int pid, int size)
     return 0;
 }
 
-int read_action(int page, int pid)
+proc_struct* find_proc(int pid)
 {
-    printf ("not implemented yet.\n");
+	proc_struct_list *aux;
+
+	aux = procs;
+
+	for(; aux; aux = aux->next)
+	{
+		if ( aux->proc->pid == pid)
+		{
+			return aux->proc;
+		}
+	}
+
+	return NULL;
+}
+
+int read_action(int pageNumber, int pid)
+{
+    proc_struct *proc = find_proc(pid);
+
+    if ( proc == NULL )
+    {
+    	printf("Process not exists. PID: %d \n", pid);
+    	exit(1);    	
+    }
+
+    page_struct *page = &proc->page_table[pageNumber];
+
+    if ( page->local == SWAP )
+    {
+    	lru_2nd_choice(page);
+    	page->page_faults++;
+    }
+
+    page->read_access++;
+    page->RB = 1;
+
     return 0;
 }
 
-int write_action(int page, int pid)
+int write_action(int pageNumber, int pid)
 {
-    printf ("not implemented yet.\n");
+    proc_struct *proc = find_proc(pid);
+
+    if ( proc == NULL )
+    {
+    	printf("Process not exists. PID: %d \n", pid);
+    	exit(1);
+    }
+
+    page_struct *page = &proc->page_table[pageNumber];
+
+    if ( page->local == SWAP )
+    {
+    	lru_2nd_choice(page);
+    	page->page_faults++;
+    }
+
+    page->write_access++;
+    page->MB = 1;
+
     return 0;
 }
 
 int endproc_action(int pid)
 {
-    printf ("not implemented yet.\n");
+	int i;
+
+    proc_struct *proc = find_proc(pid);
+
+    if ( proc == NULL )
+    {
+    	printf("Process %d not finded to destroy.\n", proc->pid);
+    	exit(1);
+    }
+
+    page_struct *page;
+
+    for(i = 0; i <= proc->size; i++)
+    {
+		page = &proc->page_table[i];
+
+		if ( page == NULL) 
+		{
+			return 0;
+		}
+
+
+		if ( page->local == MEM )
+		{
+			printf("Removing page %d %d\n", page->page, pid );
+
+			if ( page->prev_mem_page == 0)
+			{
+				mem->loaded_pages_first = page->next_mem_page;
+
+				if ( mem->loaded_pages_first )
+					mem->loaded_pages_first->prev_mem_page = NULL;
+			}
+			else
+			{
+				page->prev_mem_page->next_mem_page = page->next_mem_page;
+
+				if (page->next_mem_page )
+					page->next_mem_page->prev_mem_page = page->prev_mem_page;	
+			}
+			//Free page on memory
+			mem->used--;
+		}
+    }
+
     return 0;
 }
 
-void print_proc_mem_stats(proc_struct *proc)
+void print_procs_stats()
 {
-    printf ("not implemented yet.\n");
+	int i;
+	
+	for(; procs; procs = procs->next)
+	{
+		printf("PROCESSO: %d\n", procs->proc->pid);
+		printf("Página Acessos(R/W) NroPageFault NroSubst\n");
+		for(i = 0; i <= procs->proc->size; i++)
+		{
+			print_page_stats(procs->proc->page_table[i]);
+		}
+	}
+
+	for(; mem->loaded_pages_first; mem->loaded_pages_first = mem->loaded_pages_first->next_mem_page)
+	{
+		printf("PAGE %d \n", mem->loaded_pages_first->page);
+	}
+}
+
+void print_page_stats(page_struct page)
+{
+	printf("%d %d %d %d\n", page.page, page.read_access + page.write_access, page.page_faults, page.nro_subst);
 }
 
 int main (int argc, char *argv[])
@@ -290,8 +473,7 @@ int main (int argc, char *argv[])
     	printf("File not found\n");
     	return 2;
     }
-    
-    
+        
     system_run( file_2_memaction(system_config) );
 
     fclose(system_config);

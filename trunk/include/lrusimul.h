@@ -45,7 +45,9 @@
 typedef struct mem_struct mem_struct;
 struct mem_struct {
     int size; /* number of frames */
-    struct page_struct *loaded_pages; /* The first(head) page in use in this memory */
+    int used; /* number of frames used */
+    struct page_struct *loaded_pages_first; /* The first(head) page in use in this memory */
+    struct page_struct *loaded_pages_tail;
 };
 
 /*
@@ -88,10 +90,9 @@ struct page_struct {
     int write_access; /* stats */
     int page_faults; /* stats */
     int nro_subst; /* stats */
-    struct list_head *next_proc_page; /* The next page of the process */
-//    struct list_head *next_mem_page; /* If local=MEM, the next page of the mem. If local=SWAP, NULL. */
+    struct page_struct *prev_mem_page; /* If local=MEM, the next page of the mem. If local=SWAP, NULL. */
+    struct page_struct *next_mem_page; /* If local=MEM, the next page of the mem. If local=SWAP, NULL. */
 };
-
 
 /*
  * Receive input text file ; load mem_actions struct.
@@ -111,7 +112,17 @@ void execute_action(mem_actions_struct *action);
 /*
  * LRU second choice
  */
-void lru_2nd_choice(mem_struct *mem);
+void lru_2nd_choice(page_struct *page);
+
+/*
+ * Move a page to swap area
+ */
+void move_to_swap(page_struct *page);
+
+/*
+ * Move a page to end of FIFO mem.
+ */
+void move_to_mem_tail(page_struct *candidate);
 
 /*
  * MEMSIZE action 
@@ -139,10 +150,12 @@ int write_action(int page, int pid);
 int endproc_action(int pid);
 
 /*
+ * Reset a page informations and set her page number.
+ */
+void reset_page(page_struct *page, int page_number);
+
+/*
  * Print proc_mem stats
  */
-void print_proc_mem_stats(proc_struct *proc);
-
 void print_procs_stats();
 void print_page_stats(page_struct page);
-void reset_page(page_struct *page, int page_number);
