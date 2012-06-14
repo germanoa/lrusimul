@@ -18,11 +18,13 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <malloc.h>
 
 mem_struct *mem;
 mem_actions_struct *mem_actions;
+proc_struct_list *procs;
 
 mem_actions_struct* file_2_memaction ( FILE *system_config )
 {
@@ -119,11 +121,40 @@ mem_actions_struct* file_2_memaction ( FILE *system_config )
 
 void system_run(mem_actions_struct *top)
 {
+	if ( top->action != MEMSIZE )
+	{
+		printf("The first action must be MEMSIZE number\n");
+		exit(1);
+	}
+	
+	procs = malloc(sizeof(proc_struct_list));
 	for(;top->next; top = top->next)
 	{
 		printf("%d %d %d\n", top->action, top->parameter1, top->parameter2);
 		execute_action(top);
 	}
+	
+	print_procs_stats();
+}
+
+void print_procs_stats()
+{
+	int i;
+	
+	for(; procs; procs = procs->next)
+	{
+		printf("PROCESSO: %d\n", procs->proc->pid);
+		printf("Página Acessos(R/W) NroPageFault NroSubst\n");
+		for(i = 0; i < procs->proc->size; i++)
+		{
+			print_page_stats(procs->proc->page_table[i]);
+		}
+	}
+}
+
+void print_page_stats(page_struct page)
+{
+	printf("%d %d %d %d\n", page.page, (page.read_access + page.write_access), page.page_faults, page.nro_subst);
 }
 
 void execute_action(mem_actions_struct *action)
@@ -153,15 +184,70 @@ void lru_2nd_choice(mem_struct *mem)
     printf ("not implemented yet.\n");
 }
 
-int memsize_action(int size)
+void memsize_action(int size)
 {
-    printf ("not implemented yet.\n");
-    return 0;
+	mem = malloc(sizeof(mem_struct));
+	mem->size = size;
+}
+
+void reset_page(page_struct *page, int page_number)
+{
+	if( page == NULL)
+	{
+		printf("Invalid page.\n");
+	}
+
+	page->page = page_number;
+	//page->local = SWAP;
+	//page->RB = 0;
+//	page->MB = 0;
+	//page->read_access = 0;
+///	page->write_access = 0;
+//	page->page_faults = 0;
+//	page->nro_subst = 0;
 }
 
 int procsize_action(int pid, int size)
 {
-    printf ("not implemented yet.\n");
+	int i;
+    proc_struct *proc = malloc(sizeof(proc_struct));
+
+    if (proc == NULL)
+    {
+    	printf("Problem on alloc memory to process %d with size %d\n", pid, size);
+    	exit(1);
+    }
+
+    proc->pid = pid;
+    proc->size = size;    
+    proc->page_table = malloc((1+ size) * sizeof(proc_struct)); 
+    
+    if (proc->page_table == NULL)
+    {
+    	printf("Problem on alloc memory to process %d with size %d\n", pid, size);
+    	exit(1);
+    }
+    
+    for(i = 0; i < size; i++)
+	{
+		reset_page(&proc->page_table[i], i);
+	}
+    
+    if ( procs->proc == NULL )
+    {
+    	procs->proc = proc;
+	}
+	else
+	{
+		proc_struct_list *l = procs;
+		
+		for(; l->next; l = l->next) {
+		}
+		
+		l->next = malloc(sizeof(proc_struct_list));
+		l->next->proc = proc;		
+	}
+    
     return 0;
 }
 
