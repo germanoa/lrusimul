@@ -69,6 +69,12 @@ struct proc_struct {
     struct page_struct *page_table; /* The first(head) page of this process */
 };
 
+typedef struct proc_struct_list proc_struct_list;
+struct proc_struct_list {
+	proc_struct *proc;
+	proc_struct_list *next;
+};
+
 /*
  * Page
  */
@@ -78,12 +84,12 @@ struct page_struct {
     int local; /* present local */
     int RB; /* reference bit */
     int MB; /* modification bit */
-    int read_acess; /* stats */
-    int write_acess; /* stats */
+    int read_access; /* stats */
+    int write_access; /* stats */
     int page_faults; /* stats */
     int nro_subst; /* stats */
     struct list_head *next_proc_page; /* The next page of the process */
-    struct list_head *next_mem_page; /* If local=MEM, the next page of the mem. If local=SWAP, NULL. */
+//    struct list_head *next_mem_page; /* If local=MEM, the next page of the mem. If local=SWAP, NULL. */
 };
 
 
@@ -110,7 +116,7 @@ void lru_2nd_choice(mem_struct *mem);
 /*
  * MEMSIZE action 
  */
-int memsize_action(int size);
+void memsize_action(int size);
 
 /*
  * PROCSIZE action 
@@ -137,3 +143,6 @@ int endproc_action(int pid);
  */
 void print_proc_mem_stats(proc_struct *proc);
 
+void print_procs_stats();
+void print_page_stats(page_struct page);
+void reset_page(page_struct *page, int page_number);
