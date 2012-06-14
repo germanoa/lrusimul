@@ -154,7 +154,6 @@ void execute_action(mem_actions_struct *action)
 			write_action(action->parameter1, action->parameter2);
 			break;
 		case ENDPROC:
-			printf("ENDPROC\n");
 			endproc_action(action->parameter1);
 			break;		
 	}
@@ -286,6 +285,7 @@ int procsize_action(int pid, int size)
 
     proc->pid = pid;
     proc->size = size;    
+    proc->isGC = 0;
     proc->page_table = malloc((size + 1) * sizeof(page_struct)); 
     
     if (proc->page_table == NULL)
@@ -344,6 +344,18 @@ int read_action(int pageNumber, int pid)
     	exit(1);    	
     }
 
+    if ( !proc->isGC )
+    {
+    	if( pageNumber > proc->size )
+	    {
+	    	endproc_action(pid);
+	    }
+    }
+    else 
+    {
+    	return 0;
+    }
+
     page_struct *page = &proc->page_table[pageNumber];
 
     if ( page->local == SWAP )
@@ -366,6 +378,18 @@ int write_action(int pageNumber, int pid)
     {
     	printf("Process not exists. PID: %d \n", pid);
     	exit(1);
+    }
+
+    if ( !proc->isGC )
+    {
+    	if( pageNumber > proc->size )
+	    {
+	    	endproc_action(pid);
+	    }
+    }
+    else 
+    {
+    	return 0;
     }
 
     page_struct *page = &proc->page_table[pageNumber];
@@ -408,8 +432,6 @@ int endproc_action(int pid)
 
 		if ( page->local == MEM )
 		{
-			printf("Removing page %d %d\n", page->page, pid );
-
 			if ( page->prev_mem_page == 0)
 			{
 				mem->loaded_pages_first = page->next_mem_page;
@@ -435,26 +457,34 @@ int endproc_action(int pid)
 void print_procs_stats()
 {
 	int i;
+
+	FILE *f = fopen("perf/log.txt", "w+");
+
+	if ( f == NULL)
+	{
+		printf("Error opening perf/log.txt\n");
+		exit(1);
+	}
 	
 	for(; procs; procs = procs->next)
 	{
-		printf("PROCESSO: %d\n", procs->proc->pid);
-		printf("Página Acessos(R/W) NroPageFault NroSubst\n");
+		fprintf(f, "PROCESSO: %d\n", procs->proc->pid);
+		fprintf(f, "Página Acessos(R/W) NroPageFault NroSubst\n");
 		for(i = 0; i <= procs->proc->size; i++)
 		{
-			print_page_stats(procs->proc->page_table[i]);
+			print_page_stats(procs->proc->page_table[i], f);
 		}
 	}
 
 	for(; mem->loaded_pages_first; mem->loaded_pages_first = mem->loaded_pages_first->next_mem_page)
 	{
-		printf("PAGE %d \n", mem->loaded_pages_first->page);
+		//printf("PAGE %d \n", mem->loaded_pages_first->page, f);
 	}
 }
 
-void print_page_stats(page_struct page)
+void print_page_stats(page_struct page, FILE *f)
 {
-	printf("%d %d %d %d\n", page.page, page.read_access + page.write_access, page.page_faults, page.nro_subst);
+	fprintf(f, "%d %d %d %d\n", page.page, page.read_access + page.write_access, page.page_faults, page.nro_subst);
 }
 
 int main (int argc, char *argv[])
@@ -480,4 +510,3 @@ int main (int argc, char *argv[])
 
     return 0;
 }
-
