@@ -31,6 +31,7 @@ mem_actions_struct* file_2_memaction ( FILE *system_config )
 	int lineNumber = 0;
 	
 	char *line;
+    line = malloc(255);
 
 	int argsReads;
 	char action_str[255];
