@@ -350,6 +350,8 @@ int read_action(int pageNumber, int pid)
     	if( pageNumber > proc->size )
 	    {
 	    	endproc_action(pid);
+	    	proc->invalid = malloc(sizeof(page_struct));
+	    	reset_page(proc->invalid, pageNumber);
 	    }
     }
     else 
@@ -386,6 +388,8 @@ int write_action(int pageNumber, int pid)
     	if( pageNumber > proc->size )
 	    {
 	    	endproc_action(pid);
+	    	proc->invalid = malloc(sizeof(page_struct));
+	    	reset_page(proc->invalid, pageNumber);
 	    }
     }
     else 
@@ -470,10 +474,20 @@ void print_procs_stats()
 	for(; procs; procs = procs->next)
 	{
 		fprintf(f, "PROCESSO: %d\n", procs->proc->pid);
-		fprintf(f, "Página Acessos(R/W) NroPageFault NroSubst\n");
+
+		if ( procs->proc->invalid == 0)
+			fprintf(f, "Página Acessos(R/W) NroPageFault NroSubst\n");
+		else
+			fprintf(f, "Página Acessos(R/W) NroPageFault NroSubst AcInval\n");
+
 		for(i = 0; i <= procs->proc->size; i++)
 		{
-			print_page_stats(procs->proc->page_table[i], f);
+			print_page_stats(procs->proc->page_table[i], f, procs->proc->invalid);
+		}
+
+		if ( procs->proc->invalid != NULL)
+		{
+			fprintf(f, "%d 0 0 0 1\n", procs->proc->invalid->page);
 		}
 	}
 
@@ -483,9 +497,12 @@ void print_procs_stats()
 	}
 }
 
-void print_page_stats(page_struct page, FILE *f)
+void print_page_stats(page_struct page, FILE *f, page_struct *invalid)
 {
-	fprintf(f, "%d %d %d %d\n", page.page, page.read_access + page.write_access, page.page_faults, page.nro_subst);
+	if ( invalid == 0)
+		fprintf(f, "%d %d %d %d\n", page.page, page.read_access + page.write_access, page.page_faults, page.nro_subst);
+	else
+		fprintf(f, "%d %d %d %d 0\n", page.page, page.read_access + page.write_access, page.page_faults, page.nro_subst);
 }
 
 int main (int argc, char *argv[])

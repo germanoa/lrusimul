@@ -70,6 +70,7 @@ struct proc_struct {
     int size; /* number of pages */
     int isGC; /*Indicates if process is terminated and is available for Garbage colector.*/
     struct page_struct *page_table; /* The first(head) page of this process */
+    struct page_struct *invalid;
 };
 
 typedef struct proc_struct_list proc_struct_list;
@@ -159,4 +160,4 @@ void reset_page(page_struct *page, int page_number);
  * Print proc_mem stats
  */
 void print_procs_stats();
-void print_page_stats(page_struct page, FILE *f);
+void print_page_stats(page_struct page, FILE *f, page_struct *invalid);
